@@ -1,17 +1,15 @@
 package cz.slovnifotbal
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
+import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isEnabled
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
@@ -20,8 +18,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
 import org.junit.runner.RunWith
-import java.io.File
 
 /**
  * Instrumentační testy na skutečném zařízení/emulátoru: instalace, spuštění, načtení slovníku,
@@ -32,8 +31,16 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class GameFlowTest {
 
-    @get:Rule
+    @get:Rule(order = 0)
     val rule = createAndroidComposeRule<MainActivity>()
+
+    /** Při selhání uloží snímek obrazovky (aktivita je v tu chvíli ještě zobrazená). */
+    @get:Rule(order = 1)
+    val failureScreenshot = object : TestWatcher() {
+        override fun failed(e: Throwable?, description: Description) {
+            screenshot("FAIL_${description.methodName}", waitForIdle = false)
+        }
+    }
 
     private val enabledInput: SemanticsMatcher = hasTestTag("word_input") and isEnabled()
 
@@ -54,16 +61,19 @@ class GameFlowTest {
         rule.onNodeWithTag("move_$index").assertTextContains(word, substring = true, ignoreCase = true)
     }
 
-    /** Uloží snímek obrazovky (jen pro kontrolu vzhledu; chyba při ukládání test neshodí). */
-    private fun screenshot(name: String) {
+    /**
+     * Uloží snímek celé obrazovky (včetně klávesnice a systémových lišt) příkazem `screencap`
+     * do /data/local/tmp/slovnifotbal-shots – mazání dat aplikace mezi testy ho nesmaže, CI ho stáhne.
+     * Slouží jen pro kontrolu vzhledu; chyba při ukládání test neshodí.
+     */
+    private fun screenshot(name: String, waitForIdle: Boolean = true) {
         runCatching {
-            rule.waitForIdle()
-            val dir = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
-                ?: InstrumentationRegistry.getInstrumentation().context.getExternalFilesDir("screenshots")
-                ?: return
-            dir.mkdirs()
-            val bitmap = rule.onRoot().captureToImage().asAndroidBitmap()
-            File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            if (waitForIdle) rule.waitForIdle()
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            for (cmd in listOf("mkdir -p $SHOT_DIR", "screencap -p $SHOT_DIR/$name.png")) {
+                // výstup je potřeba dočíst – tím se zároveň počká na dokončení příkazu
+                ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(cmd)).use { it.readBytes() }
+            }
         }
     }
 
@@ -130,17 +140,26 @@ class GameFlowTest {
         rule.onNodeWithTag("settings_button").performClick()
         rule.waitUntilExactlyOneExists(hasTestTag("settings_screen"), timeoutMillis = 10_000)
         rule.onNodeWithTag("link_strict").performScrollTo().performClick()
+        rule.waitUntilExactlyOneExists(hasTestTag("link_strict") and isSelected(), timeoutMillis = 10_000)
         rule.onNodeWithTag("theme_dark").performScrollTo().performClick()
+        rule.waitUntilExactlyOneExists(hasTestTag("theme_dark") and isSelected(), timeoutMillis = 10_000)
+        screenshot("07_settings_strict_dark")
         rule.onNodeWithTag("back_button").performClick()
-        rule.waitUntilExactlyOneExists(hasTestTag("new_game_button"), timeoutMillis = 10_000)
+        // rozehraná hra má ještě stará pravidla -> upozornění; nová hra ho odstraní
+        rule.waitUntilExactlyOneExists(hasTestTag("rules_changed_banner"), timeoutMillis = 10_000)
         rule.onNodeWithTag("new_game_button").performClick() // nová hra s novými pravidly
+        rule.waitUntilDoesNotExist(hasTestTag("rules_changed_banner"), timeoutMillis = 10_000)
         play("země")
         rule.waitUntilExactlyOneExists(hasTestTag("result_title"), timeoutMillis = 15_000)
         rule.onNodeWithTag("result_title").assertTextContains("VYHRÁL JSI!")
-        screenshot("07_result_dark")
+        screenshot("08_result_dark")
         rule.onNodeWithTag("play_again_button").performClick()
         waitForPlayerTurn(30_000)
         rule.waitUntilDoesNotExist(hasTestTag("move_1"), timeoutMillis = 10_000)
-        screenshot("08_new_game_dark")
+        screenshot("09_new_game_dark")
+    }
+
+    private companion object {
+        const val SHOT_DIR = "/data/local/tmp/slovnifotbal-shots"
     }
 }

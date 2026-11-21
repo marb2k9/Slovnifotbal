@@ -49,6 +49,9 @@ jobs:
               "$BT/aapt2" dump badging "$f" | grep -E "^package:|minSdkVersion|targetSdkVersion|uses-permission|application-label:" || true
               "$BT/apksigner" verify --print-certs "$f" | head -3 || true
             done
+            echo
+            echo "== Jednotkové testy (testDebugUnitTest)"
+            python3 tools/ci/test_summary.py app/build/test-results/testDebugUnitTest || true
           } | tee dist/BUILD_INFO.txt
 
       - uses: actions/upload-artifact@v4
@@ -113,18 +116,22 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             adb logcat -c || true
-            ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest || (adb logcat -d -v time > logcat.txt; exit 1)
+            adb shell rm -rf /data/local/tmp/slovnifotbal-shots || true
+            ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest || (adb logcat -d -v time > logcat.txt; adb pull /data/local/tmp/slovnifotbal-shots shots; exit 1)
             adb logcat -d -v time > logcat.txt || true
+            adb pull /data/local/tmp/slovnifotbal-shots shots || true
 
       - name: Zveřejnění výsledků a snímků obrazovky
         if: always() && github.event_name != 'pull_request'
         run: |
           mkdir -p out
           find app/build/outputs -name "*.png" -path "*additional_output*" -exec cp {} out/ \; || true
+          if [ -d shots ]; then find shots -name "*.png" -exec cp {} out/ \; ; fi
           if [ -d app/build/reports/androidTests ]; then cp -r app/build/reports/androidTests out/report; fi
           find app/build/outputs/androidTest-results -name "*.xml" -exec cp {} out/ \; 2>/dev/null || true
           if [ -f logcat.txt ]; then grep -v " D/\| V/" logcat.txt > out/logcat.txt || true; fi
           echo "Commit: $GITHUB_SHA, Android API ${{ matrix.api-level }}, výsledek: ${{ job.status }}" > out/RESULT.txt
+          python3 tools/ci/test_summary.py app/build/outputs/androidTest-results >> out/RESULT.txt || true
           cd out
           git init -q
           git config user.name "github-actions[bot]"

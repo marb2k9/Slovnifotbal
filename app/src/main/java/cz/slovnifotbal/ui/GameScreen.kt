@@ -332,7 +332,8 @@ private fun RulesChangedBanner(onNewGame: () -> Unit) {
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp),
+            .padding(top = 8.dp)
+            .testTag("rules_changed_banner"),
     ) {
         Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
