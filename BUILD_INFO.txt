@@ -1,0 +1,31 @@
+Commit: 8723988150a90213b0ced3df7e8e88ef560dbf86
+Sestaveno: 2026-11-21T15:27:06Z
+
+== SlovniFotbal.apk (4683830 B)
+package: name='cz.slovnifotbal' versionCode='1' versionName='1.0.0' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+minSdkVersion:'26'
+targetSdkVersion:'36'
+application-label:'Slovní fotbal'
+V2 Signer: certificate DN: CN=Slovni fotbal - verejny ladici klic, O=Slovni fotbal, C=CZ
+V2 Signer: certificate SHA-256 digest: 9c3b74d1fc055b170a461356cd0951f2ecc58cb68bf3197f0c464aae6f2b74d0
+V2 Signer: certificate SHA-1 digest: e063e8653e29f5d73ed751df03f8533c1bad869f
+
+== app-debug.apk (16733233 B)
+package: name='cz.slovnifotbal' versionCode='1' versionName='1.0.0-debug' platformBuildVersionName='17' platformBuildVersionCode='37' compileSdkVersion='37' compileSdkVersionCodename='17'
+minSdkVersion:'26'
+targetSdkVersion:'36'
+application-label:'Slovní fotbal'
+V2 Signer: certificate DN: CN=Slovni fotbal - verejny ladici klic, O=Slovni fotbal, C=CZ
+V2 Signer: certificate SHA-256 digest: 9c3b74d1fc055b170a461356cd0951f2ecc58cb68bf3197f0c464aae6f2b74d0
+V2 Signer: certificate SHA-1 digest: e063e8653e29f5d73ed751df03f8533c1bad869f
+
+== Jednotkové testy (testDebugUnitTest)
+cz.slovnifotbal.data.DataStoreManagerTest: 5 testů, OK 5, selhalo 0, přeskočeno 0
+cz.slovnifotbal.domain.GameStatisticsTest: 2 testy, OK 2, selhalo 0, přeskočeno 0
+cz.slovnifotbal.engine.ComputerPlayerTest: 7 testů, OK 7, selhalo 0, přeskočeno 0
+cz.slovnifotbal.engine.DictionaryTest: 11 testů, OK 11, selhalo 0, přeskočeno 0
+cz.slovnifotbal.engine.EngineRulesTest: 17 testů, OK 17, selhalo 0, přeskočeno 0
+cz.slovnifotbal.engine.GameSnapshotTest: 4 testy, OK 4, selhalo 0, přeskočeno 0
+cz.slovnifotbal.engine.NormalizationTest: 5 testů, OK 5, selhalo 0, přeskočeno 0
+cz.slovnifotbal.viewmodel.GameViewModelTest: 14 testů, OK 14, selhalo 0, přeskočeno 0
+CELKEM: 65 testů, OK 65, selhalo 0, přeskočeno 0
