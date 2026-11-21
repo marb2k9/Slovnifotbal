@@ -37,6 +37,15 @@ android {
     }
 
     signingConfigs {
+        // Veřejný ladicí klíč projektu (záměrně v repozitáři, heslo „android“): všechna sestavení
+        // z CI i z různých počítačů mají stejný podpis, takže novější APK jde nainstalovat přes starší
+        // bez ztráty statistik. Pro veřejné šíření použij vlastní klíč (keystore.properties).
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         create("release") {
             if (hasReleaseKey) {
                 storeFile = releaseStoreFile

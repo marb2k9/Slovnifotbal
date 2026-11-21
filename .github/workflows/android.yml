@@ -32,7 +32,7 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace testDebugUnitTest
 
       - name: Sestavení debug a release APK
-        run: ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
+        run: ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease assembleDebugAndroidTest
 
       - name: Kontrola APK
         run: |

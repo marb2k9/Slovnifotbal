@@ -2,7 +2,9 @@
 
 Česká slovní hra pro Android: ty proti počítači, slovo navazuje na poslední písmeno předchozího slova.
 Aplikace je **plně offline** – slovník je součástí APK, nepotřebuje internet, účet ani registraci
-a nežádá žádná oprávnění (ani `INTERNET`).
+a nedeklaruje žádná oprávnění (ani `INTERNET`; interní oprávnění `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`,
+které do aplikací přidává knihovna androidx.core, je z manifestu odstraněné – aplikace žádné broadcast
+receivery neregistruje).
 
 | | |
 |---|---|
@@ -46,7 +48,9 @@ a nežádá žádná oprávnění (ani `INTERNET`).
 nejvíc tvých slov v jedné hře, počet použitých slov, série výher, hry a výhry podle obtížnosti.
 
 **Odolnost**: rychlé opakované odeslání i dvojklik se ignorují, výpočet počítače běží mimo hlavní vlákno
-a lze ho přerušit (nová hra během tahu počítače), rozehraná hra se ukládá po každém tahu a obnoví se po
+a lze ho přerušit (nová hra během tahu počítače), během přípravy nové hry je vstup zablokovaný (slovo
+nemůže skončit ve staré hře), rozvržení se přizpůsobí i malému displeji a otevřené klávesnici
+(historie tahů zůstává vidět), rozehraná hra se ukládá po každém tahu a obnoví se po
 otočení displeje, návratu z pozadí i po úplném ukončení aplikace. Chybějící, prázdný nebo poškozený slovník
 zobrazí chybovou obrazovku s tlačítkem „Zkusit znovu“, aplikace nespadne.
 
@@ -121,6 +125,8 @@ Plnohodnotné přegenerování: viz `tools/dictionary/README.md`.
 
 Přes počítač (USB ladění zapnuté v telefonu): `adb install -r SlovniFotbal.apk`
 
+Novější verzi stačí nainstalovat přes starší (stejný podpis) – rozehraná hra, nastavení i statistiky zůstanou.
+
 ---
 
 ## Sestavení projektu
@@ -141,15 +147,20 @@ Přes počítač (USB ladění zapnuté v telefonu): `adb install -r SlovniFotba
 
 ### GitHub Actions
 Workflow `.github/workflows/android.yml` po každém pushi do `main` spustí jednotkové testy, sestaví
-debug i release APK (artefakt **SlovniFotbal-apk**) a spustí instrumentační testy na emulátorech
-Android 8.0 (API 26) a Android 14 (API 34).
+debug i release APK (artefakt **SlovniFotbal-apk** a zároveň větev `apk-build` s APK a souborem
+`BUILD_INFO.txt`) a spustí instrumentační testy na emulátorech Android 8.0 (API 26) a Android 14 (API 34).
+Výsledky, snímky obrazovky a logcat z emulátorů jsou ve větvích `screenshots-api26` a `screenshots-api34`.
 
 ---
 
 ## Podepsaná release verze
 
-Bez vlastního klíče se `assembleRelease` podepíše ladicím klíčem (APK jde nainstalovat, ale nehodí se
-pro Google Play). Vlastní klíč:
+Bez vlastního klíče se `assembleRelease` podepíše **veřejným ladicím klíčem projektu**
+`keystore/debug.keystore` (alias `androiddebugkey`, heslo `android`; certifikát SHA-256
+`9C:3B:74:D1:FC:05:5B:17:0A:46:13:56:CD:09:51:F2:EC:C5:8C:B6:8B:F3:19:7F:0C:46:4A:AE:6F:2B:74:D0`).
+Klíč je v repozitáři záměrně: všechna sestavení (CI, Android Studio na libovolném počítači) mají stejný
+podpis, takže novější APK jde nainstalovat přes starší a statistiky zůstanou zachované. Pro Google Play
+nebo veřejné šíření se nehodí (je veřejný). Vlastní klíč:
 
 1. Vytvoř klíč (jednou, a **pečlivě ho zálohuj** – bez něj nepůjde vydat aktualizace):
    ```bash
