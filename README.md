@@ -221,6 +221,19 @@ Slovník se načítá jednou, asynchronně (Dispatchers.IO) s ukazatelem průbě
 | `viewmodel/GameViewModelTest` | 14 | celý tok hry ve ViewModelu, rychlé opakované odeslání, nová hra během tahu počítače, zablokovaný vstup během přípravy nové hry, obnovení po ukončení aplikace, chybějící/prázdný slovník, statistiky |
 | `androidTest/GameFlowTest` | 5 | instalace a spuštění na emulátoru (Android 8.0 a 14), odehrání tahu, chybová hláška, obrazovky Nastavení a Statistiky, nová hra během rozehrané hry (potvrzení, prohra ve statistikách), výhra a výsledková obrazovka v tmavém režimu, snímky obrazovky |
 
+**Výsledky posledního ověření** (GitHub Actions, commit `8723988`, 21. 11. 2026):
+
+| Kontrola | Výsledek |
+|---|---|
+| Jednotkové testy (`testDebugUnitTest`) | **65 / 65 prošlo** |
+| Instrumentační testy – emulátor Android 8.0 (API 26) | **5 / 5 prošlo** |
+| Instrumentační testy – emulátor Android 14 (API 34) | **5 / 5 prošlo** |
+| `SlovniFotbal.apk` (release, R8) | 4 683 830 B, `cz.slovnifotbal`, minSdk 26, targetSdk 36, **žádná oprávnění** |
+| `app-debug.apk` | 16 733 233 B, stejný balíček a podpis |
+
+Souhrn s výpisem `aapt2` a `apksigner` je v `BUILD_INFO.txt` (větev `apk-build`), výsledky a snímky obrazovky
+z emulátorů ve větvích `screenshots-api26` a `screenshots-api34`.
+
 ---
 
 ## Licence a zdroje třetích stran
