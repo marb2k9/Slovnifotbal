@@ -11,6 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,6 +47,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -62,8 +64,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -79,6 +79,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -153,14 +154,18 @@ fun GameScreenContent(state: GameUiState, actions: GameActions) {
             onDismissRequest = actions.onDismissDialog,
             title = { Text("Začít novou hru?") },
             text = { Text("Rozehraná hra se ukončí a započítá se jako prohra.") },
-            confirmButton = { Button(onClick = actions.onConfirmNewGame) { Text("NOVÁ HRA") } },
+            confirmButton = {
+                Button(onClick = actions.onConfirmNewGame, modifier = Modifier.testTag("confirm_new_game")) { Text("NOVÁ HRA") }
+            },
             dismissButton = { TextButton(onClick = actions.onDismissDialog) { Text("Hrát dál") } },
         )
         GameDialog.CONFIRM_SURRENDER -> AlertDialog(
             onDismissRequest = actions.onDismissDialog,
             title = { Text("Opravdu se vzdáváš?") },
             text = { Text("Hra skončí a započítá se jako prohra.") },
-            confirmButton = { Button(onClick = actions.onConfirmSurrender) { Text("Vzdát se") } },
+            confirmButton = {
+                Button(onClick = actions.onConfirmSurrender, modifier = Modifier.testTag("confirm_surrender")) { Text("Vzdát se") }
+            },
             dismissButton = { TextButton(onClick = actions.onDismissDialog) { Text("Hrát dál") } },
         )
         null -> Unit
@@ -177,7 +182,7 @@ private fun GameContent(state: GameUiState, actions: GameActions) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         SoccerBall(size = 28.dp)
                         Spacer(Modifier.width(10.dp))
-                        Text("SLOVNÍ FOTBAL", style = MaterialTheme.typography.titleLarge)
+                        Text("SLOVNÍ FOTBAL", style = MaterialTheme.typography.titleLarge, maxLines = 1)
                     }
                 },
                 actions = {
@@ -193,7 +198,7 @@ private fun GameContent(state: GameUiState, actions: GameActions) {
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -201,35 +206,25 @@ private fun GameContent(state: GameUiState, actions: GameActions) {
                 .imePadding(),
             contentAlignment = Alignment.TopCenter,
         ) {
+            // malý displej nebo otevřená klávesnice -> kompaktní rozvržení, historie má vždy dost místa
+            val imeVisible = WindowInsets.isImeVisible
+            val compact = imeVisible || maxHeight < 560.dp
+            val narrow = maxWidth < 380.dp
             Column(
                 Modifier
                     .fillMaxSize()
                     .widthIn(max = 640.dp)
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = if (narrow) 12.dp else 16.dp),
             ) {
-                // při otevřené klávesnici se hlavička zmenší, aby zůstala vidět historie i pole pro slovo
-                val imeVisible = WindowInsets.isImeVisible
-                AnimatedVisibility(!imeVisible) {
-                    Column {
-                        ScoreBoard(
-                            wins = state.statistics.wins,
-                            losses = state.statistics.losses,
-                            difficultyLabel = state.rules.difficulty.label,
-                            moveCount = state.moves.size,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                    }
-                }
-                TurnPanel(state, compact = imeVisible)
-                AnimatedVisibility(state.pendingRulesChange && !state.phase.isFinished) {
+                TurnPanel(state, compact = compact)
+                AnimatedVisibility(state.pendingRulesChange && !state.phase.isFinished && !state.preparingGame) {
                     RulesChangedBanner(actions.onNewGame)
                 }
-                Spacer(Modifier.height(8.dp))
-                MoveHistory(state, Modifier.weight(1f))
+                MoveHistory(state, showScoreBoard = !imeVisible, compact = compact, modifier = Modifier.weight(1f))
                 if (state.phase.isFinished) {
                     FinishedBar(state, actions)
                 } else {
-                    InputArea(state, actions)
+                    InputArea(state, actions, narrow = narrow)
                 }
             }
             ResultScreen(
@@ -243,32 +238,35 @@ private fun GameContent(state: GameUiState, actions: GameActions) {
     }
 }
 
-/** Kdo je na tahu a na jaké písmeno se hraje. */
+/** Kdo je na tahu a na jaké písmeno se hraje – zůstává vždy vidět. */
 @Composable
 private fun TurnPanel(state: GameUiState, compact: Boolean) {
     val colors = GameTheme.colors
     val number = remember { NumberFormat.getIntegerInstance(CS) }
-    val (title, subtitle) = when (state.phase) {
-        GamePhase.READY -> "Výkop! Jsi na tahu" to "Začni libovolným českým slovem."
-        GamePhase.PLAYER_TURN -> "Jsi na tahu" to "Slovo na ${state.requiredLetterVariants ?: "?"}"
-        GamePhase.COMPUTER_THINKING -> "Hraje počítač" to "Počítač přemýšlí…"
-        GamePhase.PLAYER_WON -> "Konec hry" to "Vyhrál jsi!"
-        GamePhase.PLAYER_LOST -> "Konec hry" to "Tentokrát vyhrál počítač."
+    val (title, subtitle) = when {
+        state.preparingGame -> "Nová hra" to "Připravuji hřiště…"
+        state.phase == GamePhase.READY -> "Výkop!" to "Začni libovolným slovem."
+        state.phase == GamePhase.PLAYER_TURN -> "Jsi na tahu" to "Slovo na ${state.requiredLetterVariants ?: "?"}"
+        state.phase == GamePhase.COMPUTER_THINKING -> "Hraje počítač" to "Počítač přemýšlí…"
+        state.phase == GamePhase.PLAYER_WON -> "Konec hry" to "Vyhrál jsi!"
+        state.phase == GamePhase.PLAYER_LOST -> "Konec hry" to "Tentokrát vyhrál počítač."
         else -> "" to ""
     }
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
     ) {
-        Row(Modifier.padding(if (compact) 8.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(if (compact) 8.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
             LetterBall(
                 letter = state.requiredLetter,
-                active = state.phase.acceptsPlayerInput,
-                size = if (compact) 60.dp else 92.dp,
+                active = state.isPlayerTurn,
+                size = if (compact) 56.dp else 80.dp,
                 modifier = Modifier.testTag("required_letter"),
             )
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 val turnColor = when (state.phase) {
                     GamePhase.COMPUTER_THINKING -> colors.computer
@@ -279,23 +277,34 @@ private fun TurnPanel(state: GameUiState, compact: Boolean) {
                     title.uppercase(CS),
                     style = MaterialTheme.typography.labelLarge,
                     color = turnColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
-                Text(subtitle, style = MaterialTheme.typography.titleMedium)
-                if (state.phase == GamePhase.PLAYER_TURN) {
-                    Text(
-                        "Ve slovníku ${remainingText(state.availableWords, number)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else if (state.phase == GamePhase.READY && !compact) {
-                    Text(
-                        "Ve hře je ${number.format(state.playableWordCount)} povolených slov",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("turn_subtitle"),
+                )
+                if (!compact && !state.preparingGame) {
+                    val info = when (state.phase) {
+                        GamePhase.PLAYER_TURN -> "Ve slovníku ${remainingText(state.availableWords, number)}"
+                        GamePhase.READY -> "Ve hře je ${number.format(state.playableWordCount)} povolených slov"
+                        else -> null
+                    }
+                    if (info != null) {
+                        Text(
+                            info,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                if (state.phase == GamePhase.COMPUTER_THINKING) {
+                if (state.phase == GamePhase.COMPUTER_THINKING || state.preparingGame) {
                     Spacer(Modifier.height(6.dp))
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(0.7f),
@@ -325,22 +334,28 @@ private fun RulesChangedBanner(onNewGame: () -> Unit) {
             .fillMaxWidth()
             .padding(top = 8.dp),
     ) {
-        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(AppIcons.Info, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Nové nastavení platí od příští hry.", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = onNewGame) { Text("Nová hra") }
+            Text(
+                "Nové nastavení platí od příští hry.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onNewGame) { Text("Nová hra", maxLines = 1) }
         }
     }
 }
 
+/** Historie tahů; skóre je první položkou a s přibývajícími tahy odjede nahoru. */
 @Composable
-private fun MoveHistory(state: GameUiState, modifier: Modifier) {
+private fun MoveHistory(state: GameUiState, showScoreBoard: Boolean, compact: Boolean, modifier: Modifier) {
     val listState = rememberLazyListState()
     val thinking = state.phase == GamePhase.COMPUTER_THINKING
-    val itemCount = state.moves.size + (if (thinking) 1 else 0)
-    LaunchedEffect(itemCount) {
-        if (itemCount > 0) listState.animateScrollToItem(itemCount) // novější tahy jsou vždy vidět
+    val header = (if (showScoreBoard) 1 else 0) + (if (state.moves.isEmpty()) 1 else 0)
+    val lastIndex = header + state.moves.size + (if (thinking) 1 else 0) // položka „bottom“
+    LaunchedEffect(lastIndex, state.moves.size) {
+        if (state.moves.isNotEmpty()) listState.animateScrollToItem(lastIndex) // novější tahy jsou vždy vidět
     }
     LazyColumn(
         state = listState,
@@ -350,8 +365,19 @@ private fun MoveHistory(state: GameUiState, modifier: Modifier) {
         contentPadding = PaddingValues(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (showScoreBoard) {
+            item(key = "score") {
+                ScoreBoard(
+                    wins = state.statistics.wins,
+                    losses = state.statistics.losses,
+                    difficultyLabel = state.rules.difficulty.label,
+                    moveCount = state.moves.size,
+                    modifier = Modifier.testTag("score_board"),
+                )
+            }
+        }
         if (state.moves.isEmpty()) {
-            item(key = "empty") { EmptyHistory(Modifier.animateItem()) }
+            item(key = "empty") { EmptyHistory(compact, Modifier.animateItem()) }
         }
         itemsIndexed(state.moves, key = { i, m -> "$i-${m.word}" }) { i, move ->
             MoveBubble(
@@ -360,38 +386,46 @@ private fun MoveHistory(state: GameUiState, modifier: Modifier) {
                 word = move.word,
                 chRule = state.rules.chRule,
                 isLatest = i == state.moves.lastIndex,
-                modifier = Modifier.animateItem(),
+                modifier = Modifier
+                    .animateItem()
+                    .testTag("move_${i + 1}"),
             )
         }
         if (thinking) {
             item(key = "thinking") { ThinkingBubble(Modifier.animateItem()) }
         }
-        item(key = "bottom") { Spacer(Modifier.height(4.dp)) }
+        item(key = "bottom") { Spacer(Modifier.height(2.dp)) }
     }
 }
 
 @Composable
-private fun EmptyHistory(modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().padding(vertical = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        SoccerBall(size = 56.dp)
-        Spacer(Modifier.height(12.dp))
+private fun EmptyHistory(compact: Boolean, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(vertical = if (compact) 8.dp else 20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (!compact) {
+            SoccerBall(size = 48.dp)
+            Spacer(Modifier.height(10.dp))
+        }
         Text("Hřiště je připravené", style = MaterialTheme.typography.titleMedium)
         Text(
             "Napiš první slovo. Počítač odpoví slovem na jeho poslední písmeno a pak zase ty.",
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp),
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
     }
 }
 
 @Composable
-private fun InputArea(state: GameUiState, actions: GameActions) {
+private fun InputArea(state: GameUiState, actions: GameActions, narrow: Boolean) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val haptics = LocalHapticFeedback.current
-    val focusRequester = remember { FocusRequester() }
     val shake = remember { Animatable(0f) }
     var successFlash by remember { mutableStateOf(false) }
     val colors = GameTheme.colors
@@ -432,11 +466,21 @@ private fun InputArea(state: GameUiState, actions: GameActions) {
     )
     val enabled = state.isPlayerTurn
 
-    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+    ) {
         AnimatedVisibility(state.hint != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
             AssistChip(
                 onClick = actions.onApplyHint,
-                label = { Text("Nápověda: ${state.hint?.uppercase(CS)} – klepni pro vložení") },
+                label = {
+                    Text(
+                        "Nápověda: ${state.hint?.uppercase(CS)} – klepni pro vložení",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 leadingIcon = { Icon(AppIcons.Lightbulb, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
                 modifier = Modifier.testTag("hint_chip"),
@@ -452,10 +496,13 @@ private fun InputArea(state: GameUiState, actions: GameActions) {
                 placeholder = {
                     Text(
                         when {
+                            state.preparingGame -> "Chvilku…"
                             state.phase == GamePhase.COMPUTER_THINKING -> "Počkej na počítač…"
                             state.requiredLetter != null -> "Slovo na ${state.requiredLetter}…"
-                            else -> "Napiš první slovo…"
+                            else -> "První slovo…"
                         },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 },
                 trailingIcon = if (successFlash) {
@@ -478,20 +525,21 @@ private fun InputArea(state: GameUiState, actions: GameActions) {
                 ),
                 modifier = Modifier
                     .weight(1f)
-                    .focusRequester(focusRequester)
                     .testTag("word_input"),
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
             Button(
                 onClick = actions.onSubmit,
                 enabled = enabled && state.input.isNotBlank(),
                 shape = RoundedCornerShape(20.dp),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(horizontal = if (narrow) 12.dp else 18.dp, vertical = 16.dp),
                 modifier = Modifier.testTag("send_button"),
             ) {
-                Icon(AppIcons.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("ODESLAT")
+                if (!narrow) {
+                    Icon(AppIcons.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text("ODESLAT", maxLines = 1)
             }
         }
         AnimatedVisibility(state.inputError != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
@@ -500,36 +548,53 @@ private fun InputArea(state: GameUiState, actions: GameActions) {
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 modifier = Modifier
-                    .padding(start = 8.dp, top = 6.dp)
+                    .padding(start = 8.dp, top = 4.dp)
                     .testTag("input_error")
                     .semantics { liveRegion = LiveRegionMode.Assertive },
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = actions.onNewGame, modifier = Modifier.testTag("new_game_button")) {
+            OutlinedButton(
+                onClick = actions.onNewGame,
+                enabled = !state.preparingGame,
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                modifier = Modifier.testTag("new_game_button"),
+            ) {
                 Icon(AppIcons.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("NOVÁ HRA")
+                Text("NOVÁ HRA", maxLines = 1)
             }
             FilledTonalButton(
                 onClick = actions.onHint,
                 enabled = enabled && state.hintsLeft > 0,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 modifier = Modifier.testTag("hint_button"),
             ) {
-                Icon(AppIcons.Lightbulb, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(AppIcons.Lightbulb, contentDescription = "Nápověda", modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("${state.hintsLeft}×")
+                Text("${state.hintsLeft}×", maxLines = 1)
             }
             Spacer(Modifier.weight(1f))
-            TextButton(
-                onClick = actions.onSurrender,
-                enabled = enabled && state.moves.isNotEmpty(),
-                modifier = Modifier.testTag("surrender_button"),
-            ) {
-                Icon(AppIcons.Flag, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Vzdát se")
+            val canSurrender = enabled && state.moves.isNotEmpty()
+            if (narrow) {
+                OutlinedIconButton(
+                    onClick = actions.onSurrender,
+                    enabled = canSurrender,
+                    modifier = Modifier.testTag("surrender_button"),
+                ) {
+                    Icon(AppIcons.Flag, contentDescription = "Vzdát se")
+                }
+            } else {
+                TextButton(
+                    onClick = actions.onSurrender,
+                    enabled = canSurrender,
+                    modifier = Modifier.testTag("surrender_button"),
+                ) {
+                    Icon(AppIcons.Flag, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Vzdát se", maxLines = 1, softWrap = false)
+                }
             }
         }
     }
@@ -551,8 +616,8 @@ private fun FinishedBar(state: GameUiState, actions: GameActions) {
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            Button(onClick = actions.onNewGame, modifier = Modifier.testTag("new_game_button")) {
-                Text(if (won) "HRÁT ZNOVU" else "ODVETA")
+            Button(onClick = actions.onNewGame, enabled = !state.preparingGame, modifier = Modifier.testTag("new_game_button")) {
+                Text(if (won) "HRÁT ZNOVU" else "ODVETA", maxLines = 1)
             }
         }
     }
@@ -573,7 +638,14 @@ fun LoadingContent(progress: Float) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             SoccerBall(size = 96.dp)
             Spacer(Modifier.height(20.dp))
-            Text("SLOVNÍ FOTBAL", fontFamily = Baloo, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.displaySmall, color = Color.White)
+            Text(
+                "SLOVNÍ FOTBAL",
+                fontFamily = Baloo,
+                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.displaySmall,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+            )
             Spacer(Modifier.height(16.dp))
             Text("Načítám český slovník…", color = Color.White, style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(12.dp))
@@ -586,7 +658,11 @@ fun LoadingContent(progress: Float) {
                 trackColor = Color.White.copy(alpha = 0.25f),
             )
             Spacer(Modifier.height(6.dp))
-            Text("${(progress.coerceIn(0f, 1f) * 100).roundToInt()} %", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelMedium)
+            Text(
+                "${(progress.coerceIn(0f, 1f) * 100).roundToInt()} %",
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
     }
 }
@@ -594,7 +670,12 @@ fun LoadingContent(progress: Float) {
 /** Chyba (např. chybějící nebo poškozený slovník). */
 @Composable
 fun ErrorContent(message: String?, onRetry: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
             SoccerBall(size = 72.dp)
             Spacer(Modifier.height(16.dp))

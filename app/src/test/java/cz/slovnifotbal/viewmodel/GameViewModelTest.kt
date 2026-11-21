@@ -198,6 +198,40 @@ class GameViewModelTest {
     }
 
     @Test
+    fun inputIsBlockedWhileNewGameIsBeingPrepared() = runTest(dispatcher) {
+        val store = newStore()
+        val vm = newViewModel(standardWords, store)
+        advanceUntilIdle()
+        vm.play("kolo")
+        advanceUntilIdle()
+        assertEquals(2, vm.uiState.value.moves.size)
+        vm.requestNewGame()
+        vm.confirmNewGame()
+        // nová hra se teprve připravuje: hned prázdné hřiště, vstup zablokovaný
+        val preparing = vm.uiState.value
+        assertTrue(preparing.preparingGame)
+        assertFalse(preparing.isPlayerTurn)
+        assertTrue(preparing.moves.isEmpty())
+        vm.play("okno") // slovo nesmí skončit ve staré hře ani v nové
+        vm.useHint()
+        vm.requestSurrender()
+        vm.requestNewGame()
+        assertEquals(null, vm.uiState.value.dialog)
+        advanceUntilIdle()
+        val s = vm.uiState.value
+        assertFalse(s.preparingGame)
+        assertTrue(s.isPlayerTurn)
+        assertEquals(GamePhase.READY, s.phase)
+        assertTrue(s.moves.isEmpty())
+        assertEquals(null, s.hint)
+        assertEquals(GameViewModel.MAX_HINTS, s.hintsLeft)
+        assertEquals(1, store.statistics().losses)
+        vm.play("okno") // teď už se slovo odehraje do nové hry
+        advanceUntilIdle()
+        assertEquals("okno", vm.uiState.value.moves.first().word)
+    }
+
+    @Test
     fun gameIsRestoredAfterAppRestart() = runTest(dispatcher) {
         val store = newStore()
         val first = newViewModel(standardWords, store)

@@ -4,6 +4,19 @@
 
     <!-- Aplikace je plně offline: nepožaduje oprávnění INTERNET ani žádná jiná oprávnění. -->
 
+    <!--
+      Knihovna androidx.core přidává do každé aplikace interní oprávnění
+      DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION (pro ContextCompat.registerReceiver).
+      Aplikace žádné broadcast receivery neregistruje (ve výsledném release DEX není jediné volání
+      registerReceiver), proto je oprávnění odstraněné a APK nedeklaruje žádná oprávnění.
+    -->
+    <permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+    <uses-permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+
     <application
         android:name=".SlovniFotbalApplication"
         android:allowBackup="true"

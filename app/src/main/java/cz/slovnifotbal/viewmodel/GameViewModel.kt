@@ -68,8 +68,10 @@ data class GameUiState(
     val playableWordCount: Int = 0,
     /** Nastavení se od začátku hry změnilo – projeví se v nové hře. */
     val pendingRulesChange: Boolean = false,
+    /** Připravuje se nová hra – vstup je do té doby zablokovaný (nic se nesmí odehrát do staré hry). */
+    val preparingGame: Boolean = false,
 ) {
-    val isPlayerTurn: Boolean get() = phase.acceptsPlayerInput
+    val isPlayerTurn: Boolean get() = phase.acceptsPlayerInput && !preparingGame
     val playerWordCount: Int get() = moves.count { it.player == Player.HUMAN }
     val lastWord: String? get() = moves.lastOrNull()?.word
 }
@@ -100,6 +102,7 @@ class GameViewModel(
     private var computerJob: Job? = null
     private var loadJob: Job? = null
     private var submitting = false
+    private var preparing = false
     private var gameGeneration = 0
     private var recordedEngine: WordFootballEngine? = null
     private var currentSettings = GameSettings()
@@ -137,7 +140,8 @@ class GameViewModel(
                 if (restored == null && saved != null) store.saveGame(null)
                 engineMutex.withLock { engine = e }
                 gameGeneration++
-                _uiState.update { it.copy(dictionaryWordCount = dict.size, input = "", inputError = null) }
+                preparing = false
+                _uiState.update { it.copy(dictionaryWordCount = dict.size, input = "", inputError = null, preparingGame = false) }
                 publish(e)
                 if (e.phase == GamePhase.COMPUTER_THINKING) startComputerMove(e)
             } catch (c: CancellationException) {
@@ -166,7 +170,7 @@ class GameViewModel(
             return
         }
         val e = engine
-        if (e == null || submitting || !state.phase.acceptsPlayerInput) return
+        if (e == null || submitting || preparing || !state.isPlayerTurn) return
         submitting = true
         val input = state.input
         val generation = gameGeneration
@@ -229,6 +233,7 @@ class GameViewModel(
 
     /** Nová hra; rozehranou hru je třeba nejdřív potvrdit (započítá se jako prohra). */
     fun requestNewGame() {
+        if (preparing) return
         val e = engine
         if (e != null && !e.phase.isFinished && e.moveCount > 0) {
             _uiState.update { it.copy(dialog = GameDialog.CONFIRM_NEW_GAME) }
@@ -239,18 +244,20 @@ class GameViewModel(
 
     fun confirmNewGame() {
         _uiState.update { it.copy(dialog = null) }
+        if (preparing) return
         startNewGame(countAsLoss = true)
     }
 
     fun requestSurrender() {
         val e = engine ?: return
-        if (e.phase.isFinished || e.moveCount == 0) return
+        if (preparing || e.phase.isFinished || e.moveCount == 0) return
         _uiState.update { it.copy(dialog = GameDialog.CONFIRM_SURRENDER) }
     }
 
     fun confirmSurrender() {
         _uiState.update { it.copy(dialog = null) }
         val e = engine ?: return
+        if (preparing) return
         computerJob?.cancel()
         viewModelScope.launch {
             val changed = engineMutex.withLock { e.surrender() }
@@ -271,7 +278,7 @@ class GameViewModel(
     fun useHint() {
         val state = _uiState.value
         val e = engine ?: return
-        if (state.hintsLeft <= 0 || !state.phase.acceptsPlayerInput) return
+        if (state.hintsLeft <= 0 || preparing || !state.isPlayerTurn) return
         viewModelScope.launch {
             val word = engineMutex.withLock { e.hint() }
             _uiState.update {
@@ -300,30 +307,70 @@ class GameViewModel(
         computerJob?.cancel()
         val old = engine
         val generation = gameGeneration
+        // Okamžitě (synchronně) zablokuje vstup a ukáže prázdné hřiště: dokud není nová hra
+        // připravená, nesmí se nic odehrát do staré hry ani se zobrazit její výsledek.
+        preparing = true
+        _uiState.update {
+            it.copy(
+                preparingGame = true,
+                phase = GamePhase.READY,
+                moves = emptyList(),
+                requiredLetter = null,
+                requiredLetterVariants = null,
+                availableWords = 0,
+                endReason = null,
+                input = "",
+                inputError = null,
+                hint = null,
+                showResult = false,
+                dialog = null,
+            )
+        }
         viewModelScope.launch {
-            val rules = currentSettings.rules
-            val newEngine = withContext(computeDispatcher) {
-                WordFootballEngine(dict, rules, ComputerPlayer(random), random)
-            }.also { it.startedAtMillis = clock() }
-            val abandoned = engineMutex.withLock {
-                val abandon = countAsLoss && old != null && !old.phase.isFinished && old.moveCount > 0 && old.abandon()
-                if (generation == gameGeneration) engine = newEngine
-                abandon
+            var ready = false
+            try {
+                val rules = currentSettings.rules
+                val newEngine = withContext(computeDispatcher) {
+                    WordFootballEngine(dict, rules, ComputerPlayer(random), random)
+                }.also { it.startedAtMillis = clock() }
+                val abandoned = engineMutex.withLock {
+                    val abandon = countAsLoss && old != null && !old.phase.isFinished && old.moveCount > 0 && old.abandon()
+                    if (generation == gameGeneration) engine = newEngine
+                    abandon
+                }
+                if (abandoned && old != null) recordResult(old)
+                if (generation != gameGeneration) return@launch
+                store.saveGame(null)
+                val snapshot = engineMutex.withLock { newEngine.toUiSnapshot() }
+                if (generation != gameGeneration) return@launch
+                // stav nové hry a odblokování vstupu v jedné změně (bez přerušení mezi nimi)
+                _uiState.update {
+                    it.copy(
+                        input = "",
+                        inputError = null,
+                        hint = null,
+                        hintsLeft = MAX_HINTS,
+                        showResult = false,
+                        dialog = null,
+                        preparingGame = false,
+                    )
+                }
+                applySnapshot(snapshot)
+                ready = true
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                // novou hru se nepodařilo připravit – zůstane zobrazená dosavadní hra
+                if (generation == gameGeneration) {
+                    engine?.let { publish(it) }
+                    _uiState.update { it.copy(inputError = "Novou hru se nepodařilo připravit. Zkus to znovu.") }
+                }
+            } finally {
+                if (generation == gameGeneration) {
+                    preparing = false
+                    if (!ready) _uiState.update { it.copy(preparingGame = false) }
+                }
             }
-            if (abandoned && old != null) recordResult(old)
-            if (generation != gameGeneration) return@launch
-            store.saveGame(null)
-            _uiState.update {
-                it.copy(
-                    input = "",
-                    inputError = null,
-                    hint = null,
-                    hintsLeft = MAX_HINTS,
-                    showResult = false,
-                    dialog = null,
-                )
-            }
-            publish(newEngine)
         }
     }
 

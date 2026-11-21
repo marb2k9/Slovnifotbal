@@ -3,11 +3,13 @@ package cz.slovnifotbal
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.and
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
@@ -23,8 +25,8 @@ import java.io.File
 
 /**
  * Instrumentační testy na skutečném zařízení/emulátoru: instalace, spuštění, načtení slovníku,
- * odehrání tahu, výhra a obrazovky. Každý test běží s čistými daty (Android Test Orchestrator,
- * clearPackageData). Snímky obrazovky se ukládají jako doplňkový výstup testů.
+ * odehrání tahu, nová hra, výhra a obrazovky. Každý test běží s čistými daty (Android Test
+ * Orchestrator, clearPackageData). Snímky obrazovky se ukládají jako doplňkový výstup testů.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -33,8 +35,17 @@ class GameFlowTest {
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
 
-    private fun waitForGame() {
-        rule.waitUntilExactlyOneExists(hasTestTag("word_input"), timeoutMillis = 60_000)
+    private val enabledInput: SemanticsMatcher = hasTestTag("word_input") and isEnabled()
+
+    /** Počká, až je hra připravená a pole pro slovo přijímá vstup. */
+    private fun waitForPlayerTurn(timeoutMillis: Long = 60_000) {
+        rule.waitUntilExactlyOneExists(enabledInput, timeoutMillis = timeoutMillis)
+    }
+
+    private fun play(word: String) {
+        waitForPlayerTurn(30_000)
+        rule.onNodeWithTag("word_input").performTextInput(word)
+        rule.onNodeWithTag("send_button").performClick()
     }
 
     /** Uloží snímek obrazovky (jen pro kontrolu vzhledu; chyba při ukládání test neshodí). */
@@ -52,21 +63,19 @@ class GameFlowTest {
 
     @Test
     fun appStartsLoadsDictionaryAndComputerAnswers() {
-        waitForGame()
+        waitForPlayerTurn()
         screenshot("01_start")
-        rule.onNodeWithTag("word_input").performTextInput("kolo")
-        rule.onNodeWithTag("send_button").performClick()
-        // počítač odpoví slovem na O (bublina 2. tahu)
-        rule.waitUntilAtLeastOneExists(hasText("POČÍTAČ  ·  2.", substring = true), timeoutMillis = 30_000)
-        rule.waitUntilExactlyOneExists(hasTestTag("word_input"), timeoutMillis = 30_000)
+        play("kolo")
+        // počítač odpoví slovem na O (bublina 2. tahu) a hráč je znovu na tahu
+        rule.waitUntilExactlyOneExists(hasTestTag("move_2"), timeoutMillis = 30_000)
+        rule.onNodeWithTag("move_1").assertTextContains("kolo", substring = true, ignoreCase = true)
+        waitForPlayerTurn(30_000)
         screenshot("02_after_first_move")
     }
 
     @Test
     fun invalidWordShowsCzechError() {
-        waitForGame()
-        rule.onNodeWithTag("word_input").performTextInput("xyzqw")
-        rule.onNodeWithTag("send_button").performClick()
+        play("xyzqw")
         rule.waitUntilExactlyOneExists(hasTestTag("input_error"), timeoutMillis = 10_000)
         rule.onNodeWithTag("input_error").assertTextContains("Toto slovo není v českém slovníku.")
         screenshot("03_error")
@@ -74,7 +83,7 @@ class GameFlowTest {
 
     @Test
     fun settingsAndStatisticsScreensOpen() {
-        waitForGame()
+        waitForPlayerTurn()
         rule.onNodeWithTag("settings_button").performClick()
         rule.waitUntilExactlyOneExists(hasTestTag("settings_screen"), timeoutMillis = 10_000)
         rule.onNodeWithTag("difficulty_hard").performClick()
@@ -87,10 +96,31 @@ class GameFlowTest {
         screenshot("05_statistics")
     }
 
+    /** Nová hra během rozehrané hry: potvrzení, prázdné hřiště a tah se odehraje už do nové hry. */
+    @Test
+    fun newGameDuringGameStartsCleanGame() {
+        play("kolo")
+        rule.waitUntilExactlyOneExists(hasTestTag("move_2"), timeoutMillis = 30_000)
+        waitForPlayerTurn(30_000)
+        rule.onNodeWithTag("new_game_button").performClick()
+        rule.waitUntilExactlyOneExists(hasTestTag("confirm_new_game"), timeoutMillis = 10_000)
+        screenshot("06_confirm_new_game")
+        rule.onNodeWithTag("confirm_new_game").performClick()
+        waitForPlayerTurn(30_000)
+        rule.waitUntilDoesNotExist(hasTestTag("move_1"), timeoutMillis = 10_000)
+        play("auto")
+        rule.waitUntilExactlyOneExists(hasTestTag("move_2"), timeoutMillis = 30_000)
+        rule.onNodeWithTag("move_1").assertTextContains("auto", substring = true, ignoreCase = true)
+        // prohraná (opuštěná) hra je ve statistikách
+        rule.onNodeWithTag("statistics_button").performClick()
+        rule.waitUntilExactlyOneExists(hasTestTag("statistics_screen"), timeoutMillis = 10_000)
+        rule.onNodeWithTag("stat_losses").assertTextContains("1", substring = true)
+    }
+
     /** Při přesném navazování na diakritiku nemá počítač na „země“ (končí na Ě) odpověď -> výhra. */
     @Test
     fun strictDiacriticsWinShowsResultScreen() {
-        waitForGame()
+        waitForPlayerTurn()
         rule.onNodeWithTag("settings_button").performClick()
         rule.waitUntilExactlyOneExists(hasTestTag("settings_screen"), timeoutMillis = 10_000)
         rule.onNodeWithTag("link_strict").performScrollTo().performClick()
@@ -98,16 +128,13 @@ class GameFlowTest {
         rule.onNodeWithTag("back_button").performClick()
         rule.waitUntilExactlyOneExists(hasTestTag("new_game_button"), timeoutMillis = 10_000)
         rule.onNodeWithTag("new_game_button").performClick() // nová hra s novými pravidly
-        rule.waitUntil(10_000) { rule.onAllNodesWithTagCount("word_input") == 1 }
-        rule.onNodeWithTag("word_input").performTextInput("země")
-        rule.onNodeWithTag("send_button").performClick()
+        play("země")
         rule.waitUntilExactlyOneExists(hasTestTag("result_title"), timeoutMillis = 15_000)
         rule.onNodeWithTag("result_title").assertTextContains("VYHRÁL JSI!")
-        screenshot("06_result_dark")
+        screenshot("07_result_dark")
         rule.onNodeWithTag("play_again_button").performClick()
-        rule.waitUntilExactlyOneExists(hasTestTag("word_input"), timeoutMillis = 10_000)
+        waitForPlayerTurn(30_000)
+        rule.waitUntilDoesNotExist(hasTestTag("move_1"), timeoutMillis = 10_000)
+        screenshot("08_new_game_dark")
     }
-
-    private fun androidx.compose.ui.test.junit4.ComposeTestRule.onAllNodesWithTagCount(tag: String): Int =
-        onAllNodes(hasTestTag(tag)).fetchSemanticsNodes().size
 }

@@ -111,7 +111,10 @@ jobs:
           target: ${{ matrix.api-level >= 30 && 'google_apis' || 'default' }}
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+          script: |
+            adb logcat -c || true
+            ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest || (adb logcat -d -v time > logcat.txt; exit 1)
+            adb logcat -d -v time > logcat.txt || true
 
       - name: Zveřejnění výsledků a snímků obrazovky
         if: always() && github.event_name != 'pull_request'
@@ -120,6 +123,7 @@ jobs:
           find app/build/outputs -name "*.png" -path "*additional_output*" -exec cp {} out/ \; || true
           if [ -d app/build/reports/androidTests ]; then cp -r app/build/reports/androidTests out/report; fi
           find app/build/outputs/androidTest-results -name "*.xml" -exec cp {} out/ \; 2>/dev/null || true
+          if [ -f logcat.txt ]; then grep -v " D/\| V/" logcat.txt > out/logcat.txt || true; fi
           echo "Commit: $GITHUB_SHA, Android API ${{ matrix.api-level }}, výsledek: ${{ job.status }}" > out/RESULT.txt
           cd out
           git init -q

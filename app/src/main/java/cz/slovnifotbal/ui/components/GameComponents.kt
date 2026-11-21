@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -135,11 +136,14 @@ fun LetterBall(letter: String?, active: Boolean, modifier: Modifier = Modifier, 
             if (l == null) {
                 SoccerBall(size = size * 0.62f)
             } else {
+                // velikost písmene je pevně svázaná s velikostí míče (nezávisí na zvětšení písma v systému)
+                val letterSize = with(LocalDensity.current) { (size * if (l.length > 1) 0.42f else 0.56f).toSp() }
                 Text(
                     text = l,
                     fontFamily = Baloo,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = if (l.length > 1) (size.value * 0.42f).sp else (size.value * 0.56f).sp,
+                    fontSize = letterSize,
+                    lineHeight = letterSize,
                     color = colors.onBall,
                     textAlign = TextAlign.Center,
                 )
@@ -176,7 +180,10 @@ fun MoveBubble(index: Int, player: Player, word: String, chRule: ChRule, isLates
     val accent = if (human) colors.player else colors.computer
     val shape = if (human) RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp) else RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp)
     Row(
-        modifier = modifier.fillMaxWidth(),
+        // jedna položka pro čtečku obrazovky („TY · 1.“, „KOLO“)
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {},
         horizontalArrangement = if (human) Arrangement.Start else Arrangement.End,
         verticalAlignment = Alignment.Bottom,
     ) {
@@ -343,7 +350,7 @@ fun SectionCard(title: String, modifier: Modifier = Modifier, content: @Composab
 @Composable
 fun StatTile(label: String, value: String, modifier: Modifier = Modifier, accent: Color = MaterialTheme.colorScheme.primary) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.semantics(mergeDescendants = true) {},
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
