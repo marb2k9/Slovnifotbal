@@ -1,0 +1,40 @@
+SLOVNÍ FOTBAL – ZDROJE A LICENCE
+================================
+
+Aplikace funguje zcela offline. Všechna data jsou součástí instalačního balíčku.
+
+1) Český slovník (assets/dictionary/cs_words.txt + cs_words.meta)
+   Zdroj: český slovník pro kontrolu pravopisu Hunspell z projektu LibreOffice
+          (repozitář LibreOffice/dictionaries, složka cs_CZ, soubory cs_CZ.dic a cs_CZ.aff).
+   Autoři: Petr Kolář a desítky přispěvatelů (původní slovník pro ispell),
+           aktualizace 2021: Miroslav Pošta (www.translatoblog.cz).
+   Licence: GNU General Public License (GNU GPL, text verze 2 je v souboru
+            hunspell_cs_CZ_README_cs.txt, Příloha A).
+   Úpravy: slova byla z formátu Hunspell rozgenerována na jednotlivé tvary, převedena
+           na malá písmena, vyřazeny byly zkratky, slova s neplatnými znaky, vulgarismy
+           a urážlivé výrazy. Ke slovům byly doplněny slovní druhy a frekvenční třída.
+           Skripty pro sestavení jsou v projektu ve složce tools/dictionary.
+
+2) Výběr běžných tvarů a frekvence slov
+   Zdroj: FrequencyWords (Hermit Dave), seznam cs_full.txt z korpusu OpenSubtitles 2018.
+   Licence obsahu: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0).
+   Použití: podle četnosti se vybraly skloňované a časované tvary zařazené do slovníku
+            a určila se frekvenční třída slov (počítač upřednostňuje známá slova).
+
+3) Slovní druhy neohebných slov
+   Zdroj: Svobodné slovníky – anglicko-český slovník (www.svobodneslovniky.cz),
+          soubor en-cs.txt v repozitáři LibreOffice/dictionaries.
+   Licence: GNU Free Documentation License 1.1 nebo pozdější.
+   Použití: pouze pro určení slovního druhu přibližně 2 000 slov bez skloňovacích vzorů.
+
+4) Písma Nunito a Baloo 2
+   Licence: SIL Open Font License 1.1 (OFL-Nunito.txt, OFL-Baloo2.txt).
+   Písma byla zúžena na latinku (včetně české diakritiky).
+
+5) Ikony
+   Cesty ikon podle Material Icons (Google), Apache License 2.0.
+
+6) Knihovny AndroidX, Jetpack Compose, Kotlin, kotlinx.coroutines
+   Licence: Apache License 2.0.
+
+Zvukové efekty a grafika (ikona aplikace, míč, hřiště) byly vytvořeny přímo pro tuto aplikaci.
