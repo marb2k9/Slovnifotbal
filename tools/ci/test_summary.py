@@ -6,6 +6,11 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+def testu(n: int) -> str:
+    """Český tvar: 1 test, 2–4 testy, 5 a víc testů."""
+    return f"{n} test" if n == 1 else f"{n} testy" if 2 <= n <= 4 else f"{n} testů"
+
+
 total = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
 rows = []
 for d in sys.argv[1:]:
@@ -23,6 +28,6 @@ for d in sys.argv[1:]:
 
 for name, v in rows:
     ok = v["tests"] - v["failures"] - v["errors"] - v["skipped"]
-    print(f"{name}: {v['tests']} testů, OK {ok}, selhalo {v['failures'] + v['errors']}, přeskočeno {v['skipped']}")
+    print(f"{name}: {testu(v['tests'])}, OK {ok}, selhalo {v['failures'] + v['errors']}, přeskočeno {v['skipped']}")
 ok = total["tests"] - total["failures"] - total["errors"] - total["skipped"]
-print(f"CELKEM: {total['tests']} testů, OK {ok}, selhalo {total['failures'] + total['errors']}, přeskočeno {total['skipped']}")
+print(f"CELKEM: {testu(total['tests'])}, OK {ok}, selhalo {total['failures'] + total['errors']}, přeskočeno {total['skipped']}")

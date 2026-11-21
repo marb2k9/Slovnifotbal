@@ -6,8 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,12 +34,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import cz.slovnifotbal.domain.EndReason
@@ -70,7 +71,17 @@ fun ResultScreen(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.55f))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { },
+                // Doteky mimo kartu nesmí projít do hry pod překryvem. Záměrně ne clickable: to by
+                // pro čtečku obrazovky sloučilo celou kartu do jedné položky.
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        do {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { it.consume() }
+                        } while (event.changes.any { it.pressed })
+                    }
+                }
+                .semantics { paneTitle = "Výsledek hry" },
             contentAlignment = Alignment.Center,
         ) {
             Box(
@@ -144,10 +155,15 @@ private fun ResultCard(state: GameUiState, onPlayAgain: () -> Unit, onClose: () 
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                ResultStat("Počet tahů", state.moves.size.toString(), Modifier.weight(1f))
+                ResultStat("Počet tahů", state.moves.size.toString(), Modifier.weight(1f).testTag("result_moves"))
                 ResultStat("Tvoje slova", state.playerWordCount.toString(), Modifier.weight(1f))
-                ResultStat("Obtížnost", state.rules.difficulty.label, Modifier.weight(1f))
             }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Obtížnost: ${state.rules.difficulty.label}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.height(16.dp))
             Text("Průběh hry", style = MaterialTheme.typography.titleMedium, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
@@ -201,9 +217,16 @@ private fun ResultCard(state: GameUiState, onPlayAgain: () -> Unit, onClose: () 
                 Text(if (won) "HRÁT ZNOVU" else "ODVETA", style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                OutlinedButton(onClick = onClose, modifier = Modifier.testTag("close_result_button")) { Text("Prohlédnout hru") }
-                TextButton(onClick = onStatistics) { Text("Statistiky") }
+            // na úzkém displeji se druhé tlačítko zalomí pod první
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                OutlinedButton(onClick = onClose, modifier = Modifier.testTag("close_result_button")) {
+                    Text("Prohlédnout hru", maxLines = 1)
+                }
+                TextButton(onClick = onStatistics) { Text("Statistiky", maxLines = 1) }
             }
         }
     }
@@ -211,7 +234,11 @@ private fun ResultCard(state: GameUiState, onPlayAgain: () -> Unit, onClose: () 
 
 @Composable
 private fun ResultStat(label: String, value: String, modifier: Modifier) {
-    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.semantics(mergeDescendants = true) {},
+    ) {
         Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(value, style = MaterialTheme.typography.headlineSmall, maxLines = 1)
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)

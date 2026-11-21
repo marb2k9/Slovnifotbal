@@ -413,7 +413,11 @@ private fun EmptyHistory(compact: Boolean, modifier: Modifier = Modifier) {
         }
         Text("Hřiště je připravené", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Napiš první slovo. Počítač odpoví slovem na jeho poslední písmeno a pak zase ty.",
+            if (compact) {
+                "Napiš první slovo, počítač odpoví."
+            } else {
+                "Napiš první slovo. Počítač odpoví slovem na jeho poslední písmeno a pak zase ty."
+            },
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
