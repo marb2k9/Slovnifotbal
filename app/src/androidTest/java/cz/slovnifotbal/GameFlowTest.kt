@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -47,6 +48,12 @@ class GameFlowTest {
         rule.onNodeWithTag("send_button").performClick()
     }
 
+    /** Ověří slovo v bublině tahu (historie se k bublině nejdřív posune, aby byla složená). */
+    private fun assertMove(index: Int, word: String) {
+        rule.onNodeWithTag("history_list").performScrollToNode(hasTestTag("move_$index"))
+        rule.onNodeWithTag("move_$index").assertTextContains(word, substring = true, ignoreCase = true)
+    }
+
     /** Uloží snímek obrazovky (jen pro kontrolu vzhledu; chyba při ukládání test neshodí). */
     private fun screenshot(name: String) {
         runCatching {
@@ -67,7 +74,7 @@ class GameFlowTest {
         play("kolo")
         // počítač odpoví slovem na O (bublina 2. tahu) a hráč je znovu na tahu
         rule.waitUntilExactlyOneExists(hasTestTag("move_2"), timeoutMillis = 30_000)
-        rule.onNodeWithTag("move_1").assertTextContains("kolo", substring = true, ignoreCase = true)
+        assertMove(1, "kolo")
         waitForPlayerTurn(30_000)
         screenshot("02_after_first_move")
     }
@@ -109,7 +116,7 @@ class GameFlowTest {
         rule.waitUntilDoesNotExist(hasTestTag("move_1"), timeoutMillis = 10_000)
         play("auto")
         rule.waitUntilExactlyOneExists(hasTestTag("move_2"), timeoutMillis = 30_000)
-        rule.onNodeWithTag("move_1").assertTextContains("auto", substring = true, ignoreCase = true)
+        assertMove(1, "auto")
         // prohraná (opuštěná) hra je ve statistikách
         rule.onNodeWithTag("statistics_button").performClick()
         rule.waitUntilExactlyOneExists(hasTestTag("statistics_screen"), timeoutMillis = 10_000)
