@@ -1,0 +1,35 @@
+{
+  "total_words": 805232,
+  "categories": {
+    "základní tvary (obecná slova)": 233854,
+    "základní tvar: OTHER": 4026,
+    "pouze vlastní jména": 143717,
+    "vlastní jména – základní tvar": 102818,
+    "základní tvar: ADJ": 69153,
+    "základní tvar: ADV": 53808,
+    "základní tvar: NOUN": 85811,
+    "pouze tvary (obecná slova)": 427661,
+    "základní tvar: VERB": 22543
+  },
+  "skipped_entries": {
+    "zkratky": 707,
+    "neplatné znaky (tečky, pomlčky, cizí písmena)": 2366,
+    "smíšená velká písmena": 99,
+    "vulgární a urážlivá slova (blocklist.txt)": 33,
+    "vulgarismy (NOSUGGEST)": 52,
+    "zakázané (FORBIDDENWORD)": 10
+  },
+  "skipped_forms": {
+    "zkratky/citoslovce bez samohlásky": 113,
+    "vulgární kořeny": 27
+  },
+  "flagless_entries": {
+    "základní tvar": 1969,
+    "tvar": 1761,
+    "bez doložení (FORM)": 950
+  },
+  "dropped_rare_forms": 3462673,
+  "source_entries": 261167,
+  "crc32": "18593da2",
+  "bytes": 9193703
+}

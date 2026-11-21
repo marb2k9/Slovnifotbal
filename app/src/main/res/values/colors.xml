@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="window_background">#FFF6FBF3</color>
+    <color name="window_background_dark">#FF0E1510</color>
+    <color name="pitch_green">#FF1E8A41</color>
+</resources>

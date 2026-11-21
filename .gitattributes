@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.ttf binary
+*.wav binary
+*.meta binary
+app/src/main/assets/dictionary/cs_words.txt text eol=lf -diff
