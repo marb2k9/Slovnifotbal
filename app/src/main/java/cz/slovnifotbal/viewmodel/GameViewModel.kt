@@ -2,7 +2,7 @@ package cz.slovnifotbal.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import cz.slovnifotbal.data.DataStoreManager
+import cz.slovnifotbal.data.GameStorage
 import cz.slovnifotbal.data.DictionaryRepository
 import cz.slovnifotbal.data.NoSound
 import cz.slovnifotbal.data.SoundEffect
@@ -81,7 +81,7 @@ data class GameUiState(
  */
 class GameViewModel(
     private val dictionaryRepository: DictionaryRepository,
-    private val store: DataStoreManager,
+    private val store: GameStorage,
     private val sounds: SoundEffects = NoSound,
     private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val random: Random = Random.Default,

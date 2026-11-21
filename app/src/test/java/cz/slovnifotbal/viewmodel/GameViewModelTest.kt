@@ -1,9 +1,9 @@
 package cz.slovnifotbal.viewmodel
 
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import cz.slovnifotbal.data.DataStoreManager
 import cz.slovnifotbal.data.DictionaryRepository
 import cz.slovnifotbal.data.DictionarySource
+import cz.slovnifotbal.data.GameStorage
+import cz.slovnifotbal.data.InMemoryGameStorage
 import cz.slovnifotbal.domain.EndReason
 import cz.slovnifotbal.domain.GamePhase
 import cz.slovnifotbal.domain.Player
@@ -12,7 +12,6 @@ import cz.slovnifotbal.engine.WordMeta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -24,19 +23,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 import java.io.FileNotFoundException
 import kotlin.random.Random
 
 /** Testy ViewModelu: tahy, opakované odeslání, restart, obnovení hry, chybějící slovník, statistiky. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class GameViewModelTest {
-
-    @get:Rule
-    val tmp = TemporaryFolder()
 
     private val dispatcher = StandardTestDispatcher()
 
@@ -67,11 +60,10 @@ class GameViewModelTest {
         "sova", "anketa", "obrys", "slon", "noha", "hrad", "domov", "voda", "atlas", "sýr", "rak", "kosa",
     )
 
-    private fun TestScope.newStore(name: String = "vm"): DataStoreManager = DataStoreManager(
-        PreferenceDataStoreFactory.create(scope = backgroundScope, produceFile = { File(tmp.root, "$name.preferences_pb") }),
-    )
+    @Suppress("UNUSED_PARAMETER")
+    private fun newStore(name: String = "vm"): InMemoryGameStorage = InMemoryGameStorage()
 
-    private fun newViewModel(source: DictionarySource, store: DataStoreManager, seed: Int = 1) = GameViewModel(
+    private fun newViewModel(source: DictionarySource, store: GameStorage, seed: Int = 1) = GameViewModel(
         dictionaryRepository = DictionaryRepository(source, dispatcher),
         store = store,
         computeDispatcher = dispatcher,

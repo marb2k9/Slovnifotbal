@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-${{ github.ref }}
@@ -34,18 +34,40 @@ jobs:
       - name: Sestavení debug a release APK
         run: ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
 
-      - name: Přejmenování APK
+      - name: Kontrola APK
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk dist/app-debug.apk
           cp app/build/outputs/apk/release/app-release.apk dist/SlovniFotbal.apk
-          ls -la dist
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          {
+            echo "Commit: $GITHUB_SHA"
+            echo "Sestaveno: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            for f in dist/*.apk; do
+              echo
+              echo "== $(basename "$f") ($(stat -c %s "$f") B)"
+              "$BT/aapt2" dump badging "$f" | grep -E "^package:|minSdkVersion|targetSdkVersion|uses-permission|application-label:" || true
+              "$BT/apksigner" verify --print-certs "$f" | head -3 || true
+            done
+          } | tee dist/BUILD_INFO.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: SlovniFotbal-apk
-          path: dist/*.apk
+          path: dist/
           if-no-files-found: error
+
+      - name: Zveřejnění APK do větve apk-build
+        if: github.event_name != 'pull_request'
+        run: |
+          cd dist
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b apk-build
+          git add -A
+          git commit -q -m "APK z commitu $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" apk-build
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -90,6 +112,23 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+
+      - name: Zveřejnění výsledků a snímků obrazovky
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          mkdir -p out
+          find app/build/outputs -name "*.png" -path "*additional_output*" -exec cp {} out/ \; || true
+          if [ -d app/build/reports/androidTests ]; then cp -r app/build/reports/androidTests out/report; fi
+          find app/build/outputs/androidTest-results -name "*.xml" -exec cp {} out/ \; 2>/dev/null || true
+          echo "Commit: $GITHUB_SHA, Android API ${{ matrix.api-level }}, výsledek: ${{ job.status }}" > out/RESULT.txt
+          cd out
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b screenshots-api${{ matrix.api-level }}
+          git add -A
+          git commit -q -m "Výsledky instrumentačních testů z commitu $GITHUB_SHA"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" screenshots-api${{ matrix.api-level }}
 
       - uses: actions/upload-artifact@v4
         if: always()

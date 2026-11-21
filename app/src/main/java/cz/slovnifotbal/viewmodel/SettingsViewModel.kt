@@ -2,7 +2,7 @@ package cz.slovnifotbal.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import cz.slovnifotbal.data.DataStoreManager
+import cz.slovnifotbal.data.GameStorage
 import cz.slovnifotbal.domain.ChRule
 import cz.slovnifotbal.domain.Difficulty
 import cz.slovnifotbal.domain.GameRules
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /** Nastavení hry – vše se okamžitě ukládá do DataStore. */
-class SettingsViewModel(private val store: DataStoreManager) : ViewModel() {
+class SettingsViewModel(private val store: GameStorage) : ViewModel() {
 
     val settings: StateFlow<GameSettings> = store.settingsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GameSettings())

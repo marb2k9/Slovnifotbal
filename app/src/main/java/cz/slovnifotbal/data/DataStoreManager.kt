@@ -32,21 +32,21 @@ import java.io.IOException
  * Lokální úložiště nastavení, statistik a rozehrané hry (Preferences DataStore).
  * Vše zůstává v zařízení – aplikace nepoužívá žádnou síť.
  */
-class DataStoreManager(private val dataStore: DataStore<Preferences>) {
+class DataStoreManager(private val dataStore: DataStore<Preferences>) : GameStorage {
 
     private val preferences: Flow<Preferences> = dataStore.data.catch { e ->
         if (e is IOException) emit(emptyPreferences()) else throw e
     }
 
-    val settingsFlow: Flow<GameSettings> = preferences.map { it.toSettings() }.distinctUntilChanged()
+    override val settingsFlow: Flow<GameSettings> = preferences.map { it.toSettings() }.distinctUntilChanged()
 
-    val statisticsFlow: Flow<GameStatistics> = preferences.map { it.toStatistics() }.distinctUntilChanged()
+    override val statisticsFlow: Flow<GameStatistics> = preferences.map { it.toStatistics() }.distinctUntilChanged()
 
-    suspend fun settings(): GameSettings = settingsFlow.first()
+    override suspend fun settings(): GameSettings = settingsFlow.first()
 
-    suspend fun statistics(): GameStatistics = statisticsFlow.first()
+    override suspend fun statistics(): GameStatistics = statisticsFlow.first()
 
-    suspend fun updateSettings(transform: (GameSettings) -> GameSettings) {
+    override suspend fun updateSettings(transform: (GameSettings) -> GameSettings) {
         dataStore.edit { prefs ->
             val updated = transform(prefs.toSettings())
             val r = updated.rules.sanitized()
@@ -62,14 +62,14 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun resetSettings() {
+    override suspend fun resetSettings() {
         dataStore.edit { prefs ->
             for (key in SETTINGS_KEYS) prefs.remove(key)
         }
     }
 
     /** Započte dokončenou hru do statistik (atomicky). */
-    suspend fun recordGame(result: GameResult) {
+    override suspend fun recordGame(result: GameResult) {
         dataStore.edit { prefs ->
             val s = prefs.toStatistics().record(result)
             prefs[GAMES] = s.gamesPlayed
@@ -88,20 +88,20 @@ class DataStoreManager(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun resetStatistics() {
+    override suspend fun resetStatistics() {
         dataStore.edit { prefs ->
             for (key in STAT_KEYS) prefs.remove(key)
         }
     }
 
     /** Uloží rozehranou hru (null = žádná rozehraná hra). */
-    suspend fun saveGame(snapshot: GameSnapshot?) {
+    override suspend fun saveGame(snapshot: GameSnapshot?) {
         dataStore.edit { prefs ->
             if (snapshot == null) prefs.remove(SAVED_GAME) else prefs[SAVED_GAME] = snapshot.encode()
         }
     }
 
-    suspend fun loadGame(): GameSnapshot? = GameSnapshot.decode(preferences.first()[SAVED_GAME])
+    override suspend fun loadGame(): GameSnapshot? = GameSnapshot.decode(preferences.first()[SAVED_GAME])
 
     private fun Preferences.toSettings(): GameSettings {
         val rules = GameRules(
