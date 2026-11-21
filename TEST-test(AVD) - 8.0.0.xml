@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="5" failures="0" errors="0" skipped="0" time="0.000" timestamp="2026-11-21T15:30:29" hostname="localhost">
+  <testsuite name="cz.slovnifotbal.GameFlowTest" tests="5" failures="0" errors="0" skipped="0" time="16.417" timestamp="2026-11-21T15:30:29" hostname="localhost">
+    <properties>
+      <property name="device" value="emulator-5554" />
+    </properties>
+    <testcase name="newGameDuringGameStartsCleanGame" classname="cz.slovnifotbal.GameFlowTest" time="4.950" />
+    <testcase name="invalidWordShowsCzechError" classname="cz.slovnifotbal.GameFlowTest" time="2.155" />
+    <testcase name="strictDiacriticsWinShowsResultScreen" classname="cz.slovnifotbal.GameFlowTest" time="3.609" />
+    <testcase name="settingsAndStatisticsScreensOpen" classname="cz.slovnifotbal.GameFlowTest" time="2.491" />
+    <testcase name="appStartsLoadsDictionaryAndComputerAnswers" classname="cz.slovnifotbal.GameFlowTest" time="3.212" />
+  </testsuite>
+</testsuites>
