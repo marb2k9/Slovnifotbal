@@ -1,0 +1,3 @@
+Commit: 8723988150a90213b0ced3df7e8e88ef560dbf86, Android API 34, výsledek: success
+cz.slovnifotbal.GameFlowTest: 5 testů, OK 5, selhalo 0, přeskočeno 0
+CELKEM: 5 testů, OK 5, selhalo 0, přeskočeno 0
