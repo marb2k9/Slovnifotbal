@@ -95,5 +95,7 @@ jobs:
         if: always()
         with:
           name: instrumented-test-reports-api${{ matrix.api-level }}
-          path: app/build/reports/androidTests/
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/connected_android_test_additional_output/
           if-no-files-found: ignore

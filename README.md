@@ -208,7 +208,7 @@ Slovník se načítá jednou, asynchronně (Dispatchers.IO) s ukazatelem průbě
 | `domain/GameStatisticsTest` | 2 | výpočet statistik |
 | `data/DataStoreManagerTest` | 5 | ukládání nastavení, statistik a hry, přetrvání po „restartu“ |
 | `viewmodel/GameViewModelTest` | 13 | celý tok hry ve ViewModelu, rychlé opakované odeslání, nová hra během tahu počítače, obnovení po ukončení aplikace, chybějící/prázdný slovník, statistiky |
-| `androidTest/GameFlowTest` | 3 | instalace a spuštění na emulátoru, odehrání tahu, chybová hláška, obrazovky Nastavení a Statistiky |
+| `androidTest/GameFlowTest` | 4 | instalace a spuštění na emulátoru (Android 8.0 a 14), odehrání tahu, chybová hláška, obrazovky Nastavení a Statistiky, výhra a výsledková obrazovka v tmavém režimu, snímky obrazovky |
 
 ---
 

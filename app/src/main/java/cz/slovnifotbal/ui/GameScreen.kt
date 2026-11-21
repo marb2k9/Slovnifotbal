@@ -12,14 +12,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -164,7 +167,7 @@ fun GameScreenContent(state: GameUiState, actions: GameActions) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun GameContent(state: GameUiState, actions: GameActions) {
     Scaffold(
@@ -204,14 +207,20 @@ private fun GameContent(state: GameUiState, actions: GameActions) {
                     .widthIn(max = 640.dp)
                     .padding(horizontal = 16.dp),
             ) {
-                ScoreBoard(
-                    wins = state.statistics.wins,
-                    losses = state.statistics.losses,
-                    difficultyLabel = state.rules.difficulty.label,
-                    moveCount = state.moves.size,
-                )
-                Spacer(Modifier.height(12.dp))
-                TurnPanel(state)
+                // při otevřené klávesnici se hlavička zmenší, aby zůstala vidět historie i pole pro slovo
+                val imeVisible = WindowInsets.isImeVisible
+                AnimatedVisibility(!imeVisible) {
+                    Column {
+                        ScoreBoard(
+                            wins = state.statistics.wins,
+                            losses = state.statistics.losses,
+                            difficultyLabel = state.rules.difficulty.label,
+                            moveCount = state.moves.size,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
+                TurnPanel(state, compact = imeVisible)
                 AnimatedVisibility(state.pendingRulesChange && !state.phase.isFinished) {
                     RulesChangedBanner(actions.onNewGame)
                 }
@@ -236,7 +245,7 @@ private fun GameContent(state: GameUiState, actions: GameActions) {
 
 /** Kdo je na tahu a na jaké písmeno se hraje. */
 @Composable
-private fun TurnPanel(state: GameUiState) {
+private fun TurnPanel(state: GameUiState, compact: Boolean) {
     val colors = GameTheme.colors
     val number = remember { NumberFormat.getIntegerInstance(CS) }
     val (title, subtitle) = when (state.phase) {
@@ -252,10 +261,11 @@ private fun TurnPanel(state: GameUiState) {
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(if (compact) 8.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
             LetterBall(
                 letter = state.requiredLetter,
                 active = state.phase.acceptsPlayerInput,
+                size = if (compact) 60.dp else 92.dp,
                 modifier = Modifier.testTag("required_letter"),
             )
             Spacer(Modifier.width(16.dp))
@@ -274,11 +284,11 @@ private fun TurnPanel(state: GameUiState) {
                 Text(subtitle, style = MaterialTheme.typography.titleMedium)
                 if (state.phase == GamePhase.PLAYER_TURN) {
                     Text(
-                        "Ve slovníku zbývá ${number.format(state.availableWords)} ${wordsWord(state.availableWords)}",
+                        "Ve slovníku ${remainingText(state.availableWords, number)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else if (state.phase == GamePhase.READY) {
+                } else if (state.phase == GamePhase.READY && !compact) {
                     Text(
                         "Ve hře je ${number.format(state.playableWordCount)} povolených slov",
                         style = MaterialTheme.typography.bodySmall,
@@ -298,10 +308,11 @@ private fun TurnPanel(state: GameUiState) {
     }
 }
 
-private fun wordsWord(n: Int): String = when {
-    n == 1 -> "slovo"
-    n in 2..4 -> "slova"
-    else -> "slov"
+/** „zbývá 1 slovo“, „zbývají 3 slova“, „zbývá 120 slov“. */
+private fun remainingText(n: Int, format: NumberFormat): String = when {
+    n == 1 -> "zbývá 1 slovo"
+    n in 2..4 -> "zbývají $n slova"
+    else -> "zbývá ${format.format(n)} slov"
 }
 
 @Composable
